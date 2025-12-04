@@ -24,8 +24,34 @@ load_dotenv()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/token")
 
 # Honeypot JSON logger for Logstash integration
-LOG_DIR = Path(os.getenv("LOG_DIR", "/data/deemster/log"))
-LOG_FILE = LOG_DIR / "deemster.json"
+def _get_log_file_path() -> Path:
+    """Get writable log file path, with fallback options."""
+    primary_dir = Path(os.getenv("LOG_DIR", "/opt/deemster/log"))
+    fallback_dir = Path("/tmp/deemster/log")
+    
+    # Try primary directory first
+    try:
+        primary_dir.mkdir(parents=True, exist_ok=True)
+        test_file = primary_dir / ".write_test"
+        test_file.touch()
+        test_file.unlink()
+        return primary_dir / "deemster.json"
+    except (OSError, PermissionError):
+        # Fall back to /tmp if /data is not writable
+        logging.getLogger("cxc-honeypod").warning(
+            f"Cannot write to {primary_dir}, using fallback {fallback_dir}"
+        )
+        try:
+            fallback_dir.mkdir(parents=True, exist_ok=True)
+            return fallback_dir / "deemster.json"
+        except (OSError, PermissionError) as e:
+            logging.getLogger("cxc-honeypod").error(
+                f"Cannot create log directory: {e}. Logging will be disabled."
+            )
+            return None
+
+
+LOG_FILE = _get_log_file_path()
 
 
 class HoneypotLogger:
@@ -34,13 +60,11 @@ class HoneypotLogger:
     Each log entry contains src_ip, src_port, dest_ip, dest_port, timestamp, and event data.
     """
 
-    def __init__(self, log_file: Path) -> None:
+    def __init__(self, log_file: Optional[Path]) -> None:
         self.log_file = log_file
-        self._ensure_log_dir()
-
-    def _ensure_log_dir(self) -> None:
-        """Ensure log directory exists."""
-        self.log_file.parent.mkdir(parents=True, exist_ok=True)
+        self.enabled = log_file is not None
+        if not self.enabled:
+            logging.getLogger("cxc-honeypod").warning("Honeypot logging is disabled due to lack of writable directory")
 
     def _get_timestamp(self) -> str:
         """Return ISO8601 timestamp in UTC."""
@@ -104,6 +128,9 @@ class HoneypotLogger:
             log_entry.update(extra)
 
         # Write JSON line to log file
+        if not self.enabled or not self.log_file:
+            return
+        
         try:
             with open(self.log_file, "a", encoding="utf-8") as f:
                 f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
