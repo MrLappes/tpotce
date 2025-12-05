@@ -164,6 +164,7 @@ services:
 
 ## Logstash service
   logstash:
+    build: ./docker/elk/logstash
     container_name: logstash
     restart: always
     depends_on:
@@ -180,8 +181,6 @@ services:
     ports:
      - "127.0.0.1:64305:64305"
     mem_limit: 2g
-    image: ${TPOT_REPO}/logstash:${TPOT_VERSION}
-    pull_policy: ${TPOT_PULL_POLICY}
     volumes:
      - ${TPOT_DATA_PATH}:/data
 

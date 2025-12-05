@@ -15,5 +15,5 @@ services:
     env_file:
       - .env
     volumes:
-      - $HOME/tpotce/data/deemster/log:/data/deemster/log
+        - ${TPOT_DATA_PATH}/deemster/log:/opt/deemster/log
     restart: unless-stopped
