@@ -70,6 +70,27 @@ class HoneypotLogger:
         """Return ISO8601 timestamp in UTC."""
         return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.%f")[:-3] + "Z"
 
+    def _extract_text_from_response(self, response_data: Optional[str]) -> Optional[str]:
+        """Extract readable text from token-based response."""
+        if not response_data:
+            return None
+        try:
+            # Response might be token stream like: {"token_id": 0, "text": "I'm"}{"token_id": 1, "text": " "}...
+            # Extract all "text" values
+            text_parts = []
+            for line in response_data.split("}{"):
+                line = line.strip("{}")
+                if '"text":' in line:
+                    try:
+                        obj = json.loads("{" + line + "}")
+                        if "text" in obj:
+                            text_parts.append(obj["text"])
+                    except:
+                        pass
+            return "".join(text_parts) if text_parts else response_data
+        except:
+            return response_data
+
     def log_event(
         self,
         event_type: str,
@@ -120,6 +141,10 @@ class HoneypotLogger:
             log_entry["request"] = request_data
         if response_data:
             log_entry["response"] = response_data
+            # Add human-readable response text
+            response_text = self._extract_text_from_response(response_data)
+            if response_text:
+                log_entry["response_text"] = response_text
         if username:
             log_entry["username"] = username
         if user_agent:
