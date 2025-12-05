@@ -142,9 +142,9 @@ class HoneypotLogger:
         if response_data:
             log_entry["response"] = response_data
             # Add human-readable response text
-            response_text = self._extract_text_from_response(response_data)
-            if response_text:
-                log_entry["response_text"] = response_text
+        response_text = self._extract_text_from_response(response_data)
+        if response_text:
+            log_entry["response_text"] = response_text
         if username:
             log_entry["username"] = username
         if user_agent:
